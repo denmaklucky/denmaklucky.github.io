@@ -16,7 +16,8 @@ comments: true
 
 Приступаем к написанию сервиса. Для начало создадим интерфейс в проекте DialogService, который будет является супер типом для ViewModel’ей. Он будет пустой. Я его назову IViewModelModal.
 Затем я создаю интерфейс, который будет представлять диалоговый сервис.
-```
+
+```csharp
 namespace DialogService
 {
     interface IDialog
@@ -26,7 +27,8 @@ namespace DialogService
 }
 ```
 Далее нужно реализовать его, для этого я создам класс, который назову Dialog.
-```
+
+```csharp
 namespace DialogService
 {
     public class Dialog : IDialog
@@ -48,7 +50,8 @@ namespace DialogService
 Ну всё. Теперь можно пойти и выпить чаю потому, что диалоговый сервис готов.
 Осталось дело за малым, показать как он работает. Для этого на главное окно добавим кнопку, которая и будет вызывать диалоговое окно.
 Так как диалоговый сервис предполагает использования паттерна MVVM то логичней было бы сделать привязку команды в ViewModel. Для этого создаем простой класс Command, который реализует ICommand.
-```
+
+```csharp
 public Class Command : ICommand
 {
     readonly Action<object> _execute;
@@ -78,7 +81,7 @@ public Class Command : ICommand
 Далее нужно реализовать окно для диалога. Оно представляет из себя обычное окно, которое содержит TextBox по середине.  Для этого создаем ModalViewModel, которая содержит одно текстовое свойства.
 Далее реализовываем MainViewModel. Данный класс будет содержать целую одну командищу.
 
-```
+```csharp
 public class MainViewModel
 {
     private void ShowDialog(object obj)
