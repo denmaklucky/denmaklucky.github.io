@@ -6,7 +6,7 @@
 name: Макаренко Денис
 
 # Short bio or description (displayed in the header)
-description: Разработчик .NET
+description: .NET разработчик
 
 # URL of your avatar or profile pic (you could use your GitHub profile pic)
 avatar: /images/logo.jpg
@@ -22,7 +22,7 @@ footer-links:
   facebook:
   flickr:
   github: denmaklucky
-  instagram:
+  instagram: denmaklucky
   linkedin:
   pinterest:
   rss: # just type anything here for a working RSS icon
@@ -73,7 +73,7 @@ sass:
   style: :expanded # You might prefer to minify using :compressed
 
 # Use the following plug-ins
-gems:
+plugins:
   - jekyll-sitemap # Create a sitemap using the official Jekyll sitemap gem
   - jekyll-feed # Create an Atom feed using the official Jekyll feed gem
 
