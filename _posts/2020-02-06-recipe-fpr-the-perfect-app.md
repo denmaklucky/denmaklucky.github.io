@@ -14,5 +14,58 @@ Blazor... Сколько шума наделала эта технология. 
 
 ![Empty template]({{ site.url }}/images/p10/1.png) 
 
-> При создания проект обратите внимания версию .Net Core. Версия должна быть >= 3.1.x
+`При создания проект обратите особое внимания на версию .Net Core. Версия должна быть >= 3.1.x`
+
+Далее нужно настроить приложения для работы как с инфраструктурой MVC и Blazor.
+
+Для этого добавим в класс *Startup.cs* следующее:
+
+~~~c#
+public class Startup
+{
+      public void ConfigureServices(IServiceCollection services)
+      {
+            services.AddControllersWithViews();
+            services.AddServerSideBlazor();
+      }
+
+      public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+      {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseStaticFiles();
+            app.UseRouting();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllerRoute(
+                    name: "default",
+                    pattern: "{Controller=Home}/{Action=Index}"
+                );
+                endpoints.MapBlazorHub();
+            });
+      }
+ }
+~~~
+
+Первое, что бросается в глаза (ну лично для меня) так это то, что в версии .Net Core 3.1 изменилось подключения сервисов необходимое для работы MVC.
+
+Теперь вместо 
+
+```c#
+ services.AddMvc();
+```
+
+мы имеем
+
+```c#
+services.AddControllersWithViews();
+```
+
+
+
+
 
