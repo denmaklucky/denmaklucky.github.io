@@ -191,3 +191,184 @@ Microsoft любезно предоставила возможность соз�
 И как результат я имею красивое сообщения для клиента об ошибке.
 
 ![The nice message for client]({{ site.url }}/images/p11/4.png)
+
+# Client
+
+Как я писал выше в качестве клиента я буду использовать Blazor Server. 
+
+Для начала создадим проект на .NET Core 3.1 по типу `Empty`.
+
+Первое что надо сделать настроить его для работы с Blazor. Для этого я внесу изменение в класс *Startup*.
+
+{% highlight c#%}
+    public class Startup
+    {
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddRazorPages();
+            services.AddServerSideBlazor();
+            services.AddHttpClient();
+        }
+
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        {
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+            }
+
+            app.UseRouting();
+            app.UseStaticFiles();
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapFallbackToPage("/_Host");
+                endpoints.MapBlazorHub();
+            });
+        }
+    }
+{% endhighlight %}
+
+После этого нужно созадть директорию *Pages*. В данной директории будет храниться хост для запуска компонентов Blazor. 
+
+Для того, чтобы все компоненты могли использовать одинаковые сборки, без директивы using в начале файла, нужно создать файл *_Imports.razor*.
+
+После внесенных изменений решение выглядит следующим образом:
+
+![The solution]({{ site.url }}/images/p11/5.png)
+
+Я подготовил проект для старта и запуска Blazor. Далее нужно реализовать сам интерфейс. 
+
+Я хочу сделать приложение похожее на изображение ниже:
+
+![The design]({{ site.url }}/images/p11/5.png)
+
+Слева у меня будет часть, где будут отображться всё существующее заметки. Справа будет карточка выделенной заметки.
+
+Судя по всему мне нужно реализовать 3 компонента: лист с заметками, компонент самой заметки и карточка заметки.
+
+`Компонент заметки - это то, как заметка будет представлена в списки, а карточка заметки - это отображение заметки, когда пользователь "кликает" на неё`
+
+Первым делом я создам компонент *NoteComponent.razor*, который будет отвечать за отображение заметки в списки. Данный компонент будет принимать в качестве параметра объект *Note*, будет менять стиль при взаимодействии с указателем мыши, и будет выкидывать событие о клике.
+
+Без слишних слов, код:
+
+{% highlight html %}
+<div class="@Class border-bottom" @onmouseover="OnMouseOver" @onmouseout="OnMouseOut" @onclick="@(()=>OnMouseClick(Model.Id))"
+     pag-action="Edit" page-model="@Model.Id">
+    <div class="note-title">
+        @Model.Title
+    </div>
+    <div class="note-body">
+        @Model.Description
+    </div>
+</div>
+
+@code {
+
+    public void OnMouseOver() => Class = "clr-selected";
+
+    public void OnMouseOut() => Class = "";
+
+    public Task OnMouseClick(int noteId) => OnClickNoteCallBack.InvokeAsync(Model);
+
+    [Parameter]
+    public Note Model { get; set; }
+
+    [Parameter]
+    public EventCallback<Note> OnClickNoteCallBack { get; set; }
+
+    public string Class { get; set; }
+}
+{% endhighlight %}
+
+Далее необходимо реализовать компонент, который отображаем список всё заметок, но для начало нужно реализовать сервис для "общение" с WebApi.
+
+Сервис должен получать данные от WebApi по http, для этого ему нужен *HttpClient*. Т.к. при Dispose объекта HttpClient не всегда освобождается порт, я воспользует новой возможностью, который появился в .Net Core, IHttpClientFactory.
+
+У HttpClient нет методов, которые позволели мне отправлять и получать данные от сервера в формате Json. Для того, чтобы получить данные в нужном мне формате мне пришлось бы сначала сделать запрос к сервера, затем считать контент и только потом десериализовать его. А т.к. сервис, в клиенте, будет неоднократно получать и отправлять данные серверу, то придется писать данный код много раз. Чтобы этого не далть я вынес данный код в методы расшения для HttCliet.
+
+{% highlight c#%}
+    public static class HttpClientExtensions
+    {
+        public static async Task<T> GetJsonAsync<T>(this HttpClient httpClient, string requestedUrl)
+        {
+            var response = await httpClient.GetAsync(requestedUrl);
+
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Can't call {requestedUrl}; Status code {response.StatusCode}");
+
+            var content = await response.Content.ReadAsStringAsync();
+            return JsonConvert.DeserializeObject<T>(content);
+        }
+
+        public static async Task<bool> PostJsonAsync<T>(this HttpClient httpClient, string requestedUrl, T obj)
+        {
+            var stringContent = new StringContent(JsonConvert.SerializeObject(obj), Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(requestedUrl, stringContent);
+            return response.IsSuccessStatusCode;
+        }
+    }
+{% endhighlight %}
+
+Сам сервис, который находится в клиенте:
+
+{% highlight c#%}
+    public class NoteService : INoteService, IDisposable
+    {
+        //Адрес сервера
+        private const string Server = "https://localhost:44350/api/";
+        private readonly HttpClient _httpClient;
+
+        public NoteService(IHttpClientFactory httpFactory)
+            => _httpClient = httpFactory.CreateClient();
+
+
+        public async Task CreateOrUpdate(Note note)
+        {
+            const string method = "notes/createOrUpdate";
+            await _httpClient.PostJsonAsync<Note>($"{Server}{method}", note);
+        }
+
+        public Task<List<Note>> GetNotes()
+        {
+            const string method = "notes/list";
+            return _httpClient.GetJsonAsync<List<Note>>($"{Server}{method}");
+        }
+
+        public async Task Delete(int noteId)
+        {
+            const string method = "notes/delete/";
+            await _httpClient.DeleteAsync($"{Server}{method}{noteId}");
+        }
+
+        public void Dispose()
+            => _httpClient?.Dispose();
+    }
+{% endhighlight %}
+
+Как по мне выглядит очень сиспотично.
+
+В самом компоненте нет ничего сложного. Если интеренсо то реализацию можно посмотреть [тут](https://github.com/denmaklucky/Examples/blob/master/BlazorServer/Notes/Notes/Components/NotePage.razor).
+
+Вот и результат:
+
+![The list of notes]({{ site.url }}/images/p11/7.gif)
+
+Все что осталось для того, что реализовть то что я хотел изначально, так это карточку заметки.
+
+В карточке нужно отображать свойства объекта такие как: Title, Description. Так же в карточке должна быть возможнасть управлять конретной заметки, а именно обновлять или удалять её.
+
+Всё это реализовано [здесь](https://github.com/denmaklucky/Examples/blob/master/BlazorServer/Notes/Notes/Components/EditNote.razor).
+
+Результат карточки:
+
+![The list of notes]({{ site.url }}/images/p11/8.gif)
+
+Заключение:
+
+Наконец-то появилась возможность реализовывать Web-клиента на Razor.
+
+Из основных недостатков можно отметить, что общение между сервером (где сидит клиент) и самим представление проиходит через html. Если реализовать интрефейс, в котором есть 2^10 строчек в таблице. И при каждом клике добавляется ещё столько же. В этом случаи сервер будет гонять **мегабайты** html.
+
+Как всегда ссылка на [репозиторий](https://github.com/denmaklucky/Examples/tree/master/BlazorServer/Notes).
